@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using LMS.Models.LMSModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -163,15 +164,56 @@ namespace LMS.Controllers
     public IActionResult SubmitAssignmentText(string subject, int num, string season, int year, 
       string category, string asgname, string uid, string contents)
     {
-            using (db)
+            try
             {
-                var query1 = from co in db.Courses where co.DeptAbbreviation == subject && co.Number == num
-                             join cl in db.Classes on co.CourseId equals cl.CourseId
-                             where cl.Season == season && cl.Year == year
+                using (db)
+                {
+                    // Holds the given assignment
+                    var query1 = from co in db.Courses
+                                 where co.DeptAbbreviation == subject && co.Number == num
+                                 join cl in db.Classes on co.CourseId equals cl.CourseId
+                                 where cl.Season == season && cl.Year == year
+                                 join ac in db.AssignmentCategories on cl.ClassId equals ac.ClassId
+                                 where ac.Name == category
+                                 join a in db.Assignments on ac.CategoryId equals a.CategoryId
+                                 where a.Name == asgname
+                                 select a;
 
-            }
 
+                    var query2 = (from q in query1
+                                  join s in db.Submissions on q.AssignmentId equals s.AssignmentId
+                                  where s.UId == uid
+                                  select s).First();
+                    // student hasn't submitted assignment yet
+                    if (query2 == null)
+                    {
+                        Submissions s = new Submissions();
+                        s.TimeStamp = DateTime.Now;
+                        s.Score = 0;
+                        s.Contents = contents;
+                        s.UId = uid;
+                        s.AssignmentId = query1.First().AssignmentId;
+                        db.Submissions.Add(s);
+
+                    }
+                    // student already submitted, update timestamp and contents
+                    else
+                    {
+                        query2.TimeStamp = DateTime.Now;
+                        query2.Contents = contents;
+                    }
+
+                    db.SaveChanges();
+                    return Json(new { success = true });
+
+                }
+            } catch
+            {
                 return Json(new { success = false });
+            }
+           
+
+           
     }
 
     
@@ -186,9 +228,38 @@ namespace LMS.Controllers
     /// <returns>A JSON object containing {success = {true/false},
 	/// false if the student is already enrolled in the Class.</returns>
     public IActionResult Enroll(string subject, int num, string season, int year, string uid)
-    {      
+    {
+            try
+            {
+                using (db)
+                {
+                    var query = from co in db.Courses
+                                where co.DeptAbbreviation == subject && co.Number == num
+                                join cl in db.Classes on co.CourseId equals cl.CourseId
+                                join eg in db.EnrollmentGrades on cl.ClassId equals eg.ClassId
+                                where eg.UId == uid
+                                select eg;
+                    // Student not enrolled in this class
+                    if (query == null)
+                    {
+                        EnrollmentGrades eg = new EnrollmentGrades();
+                        eg.UId = uid;
+                        
+                        return Json(new { success = true });
+                    }
+                    // Student already enrolled
+                    else
+                    {
+                        return Json(new { success = true });
+                    }
+                }
+            } catch
+            {
+                return Json(new { success = false });
+            }
+            
 
-      return Json(new { success = false });
+                
     }
 
 

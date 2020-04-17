@@ -155,3 +155,5 @@ C:\Users\u0871009\Desktop\2020\CS5530 Databases\Project-Phase3\LMS\obj\Debug\net
 C:\Users\u0871009\Desktop\2020\CS5530 Databases\Project-Phase3\LMS\obj\Debug\netcoreapp2.2\LMS.dll
 C:\Users\u0871009\Desktop\2020\CS5530 Databases\Project-Phase3\LMS\obj\Debug\netcoreapp2.2\LMS.pdb
 C:\Users\u0871009\Desktop\2020\CS5530 Databases\Project-Phase3\LMS\obj\Debug\netcoreapp2.2\LMS.csproj.CopyComplete
+C:\Users\u0871009\Desktop\2020\CS5530 Databases\Project-Phase3\LMS\obj\Debug\netcoreapp2.2\LMS.csproj.CoreCompileInputs.cache
+C:\Users\u0871009\Desktop\2020\CS5530 Databases\Project-Phase3\LMS\obj\Debug\netcoreapp2.2\LMS.genruntimeconfig.cache
