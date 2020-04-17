@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using LMS.Models.LMSModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -40,9 +41,12 @@ namespace LMS.Controllers
     /// <returns>The JSON result</returns>
     public IActionResult GetCourses(string subject)
     {
-      
-      return Json(null);
-    }
+            using (db)
+            {
+                var query = from c in db.Courses where c.DeptAbbreviation == subject select new { number = c.CourseId, name = c.Name };
+                return Json(query.ToArray());
+            }
+        }
 
 
     
@@ -59,9 +63,20 @@ namespace LMS.Controllers
     /// <returns>The JSON result</returns>
     public IActionResult GetProfessors(string subject)
     {
-   
-      return Json(null);
-    }
+            using (db)
+            {
+                var query = from p in db.Professors
+                            where p.DeptAbbreviation == subject
+                            join u in db.Users on p.UId equals u.UId
+                            select new
+                            {
+                                lname = u.LastName,
+                                fname = u.FirstName,
+                                uid = u.UId
+                            };
+                return Json(query.ToArray());
+            }
+        }
 
 
 
@@ -76,9 +91,28 @@ namespace LMS.Controllers
 	/// false if the Course already exists.</returns>
     public IActionResult CreateCourse(string subject, int number, string name)
     {
-      
 
-      return Json(new { success = false });
+            using (db)
+            {
+                var query = from c in db.Courses where c.DeptAbbreviation == subject && c.Number == number select c;
+                // verify course doesn't exist
+                if (query != null)
+                {
+                    Courses c = new Courses();
+                    c.DeptAbbreviation = subject;
+                    c.Number = number;
+                    c.Name = name;
+                    db.Courses.Add(c);
+                    db.SaveChanges();
+                    return Json(new { success = true });
+                } else
+                {
+                    return Json(new { success = false });
+                }
+                
+            }
+
+         
     }
 
 
@@ -100,9 +134,50 @@ namespace LMS.Controllers
     /// a Class offering of the same Course in the same Semester.</returns>
     public IActionResult CreateClass(string subject, int number, string season, int year, DateTime start, DateTime end, string location, string instructor)
     {
-      
-      return Json(new { success = false });
-    }
+            using (db)
+            {
+                var query = from c in db.Classes where c.Location == location && c.Season == season && c.Year == year && start.TimeOfDay < c.EndTime && end.TimeOfDay > c.StartTime select c;
+                // verify another class doesn't overlap
+                if (query != null)
+                {
+                    return Json(new { success = false });
+                }
+                else
+                {
+                    query = from c in db.Classes where c.Season == season && c.Year == year join course in db.Courses on c.CourseId equals course.CourseId select c;
+                    if (query != null)
+                    {
+                        return Json(new { success = false });
+                    } else
+                    {
+                        try
+                        {
+                            var query2 = from course in db.Courses
+                                         where course.DeptAbbreviation == subject && course.Number == number
+                                         select new
+                                         {
+                                             courseID = course.CourseId
+                                         };
+
+                            Classes c = new Classes();
+                            c.Season = season;
+                            c.Year = (uint)year;
+                            c.Location = location;
+                            c.StartTime = start.TimeOfDay;
+                            c.EndTime = end.TimeOfDay;
+                            c.UId = instructor;
+                            c.CourseId = query2.First().courseID;
+                        } catch (Exception e)
+                        {
+                            return Json(new { success = false });
+                        }
+                      
+                    }
+                }
+                return Json(new { success = false });
+
+            }
+        }
 
 
     /*******End code to modify********/
