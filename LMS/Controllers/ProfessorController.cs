@@ -105,8 +105,27 @@ namespace LMS.Controllers
     /// <returns>The JSON array</returns>
     public IActionResult GetStudentsInClass(string subject, int num, string season, int year)
     {
-      
-      return Json(null);
+            using (db)
+            {
+                var query = from co in db.Courses
+                            where co.DeptAbbreviation == subject && co.Number == num
+                            join cl in db.Classes on co.CourseId equals cl.CourseId
+                            where cl.Season == season && cl.Year == year
+                            join eg in db.EnrollmentGrades on cl.ClassId equals eg.ClassId
+                            join u in db.Users on eg.UId equals u.UId
+                            select new
+                            {
+                                fname = u.FirstName,
+                                lname = u.LastName,
+                                uid = u.UId,
+                                dob = u.Dob,
+                                grade = eg.Grade
+                            };
+                return Json(query.ToArray());
+
+            }
+
+                
     }
 
 
@@ -129,8 +148,47 @@ namespace LMS.Controllers
     /// <returns>The JSON array</returns>
     public IActionResult GetAssignmentsInCategory(string subject, int num, string season, int year, string category)
     {
-
-      return Json(null);
+            using (db)
+            {
+                // return assignments in all categories
+                if (category == null)
+                {
+                    var query = from co in db.Courses
+                                where co.DeptAbbreviation == subject && co.Number == num
+                                join cl in db.Classes on co.CourseId equals cl.CourseId
+                                where cl.Season == season && cl.Year == year
+                                join ac in db.AssignmentCategories on cl.ClassId equals ac.ClassId
+                                join a in db.Assignments on ac.CategoryId equals a.CategoryId
+                                select new
+                                {
+                                    aname = a.Name,
+                                    cname = ac.Name,
+                                    due = a.DueDate,
+                                    submissions = a.Submissions
+                                };
+                    return Json(query.ToArray());
+                }
+                // return assignments from category
+                else
+                {
+                    var query = from co in db.Courses
+                                where co.DeptAbbreviation == subject && co.Number == num
+                                join cl in db.Classes on co.CourseId equals cl.CourseId
+                                where cl.Season == season && cl.Year == year
+                                join ac in db.AssignmentCategories on cl.ClassId equals ac.ClassId
+                                where ac.Name == category
+                                join a in db.Assignments on ac.CategoryId equals a.CategoryId
+                                select new
+                                {
+                                    aname = a.Name,
+                                    cname = ac.Name,
+                                    due = a.DueDate,
+                                    submissions = a.Submissions
+                                };
+                    return Json(query.ToArray());
+                }
+            }
+                
     }
 
 
@@ -245,9 +303,24 @@ namespace LMS.Controllers
     /// <param name="uid">The professor's uid</param>
     /// <returns>The JSON array</returns>
     public IActionResult GetMyClasses(string uid)
-    {     
+    {
 
-      return Json(null);
+            using (db)
+            {
+                var query = from cl in db.Classes
+                            where cl.UId == uid
+                            join co in db.Courses on cl.CourseId equals co.CourseId
+                            select new
+                            {
+                                subject = co.DeptAbbreviation,
+                                number = co.Number,
+                                name = co.Name,
+                                season = cl.Season,
+                                year = cl.Year
+                            };
+
+                return Json(query.ToArray());
+            }
     }
 
 

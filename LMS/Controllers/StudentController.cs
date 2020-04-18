@@ -233,24 +233,32 @@ namespace LMS.Controllers
             {
                 using (db)
                 {
-                    var query = from co in db.Courses
-                                where co.DeptAbbreviation == subject && co.Number == num
-                                join cl in db.Classes on co.CourseId equals cl.CourseId
-                                join eg in db.EnrollmentGrades on cl.ClassId equals eg.ClassId
+                    // Holds given class
+                    var query1 = from co in db.Courses
+                                 where co.DeptAbbreviation == subject && co.Number == num
+                                 join cl in db.Classes on co.CourseId equals cl.CourseId 
+                                 where cl.Year == year && cl.Season == season select cl;
+
+                    // Holds EnrollmentGrade if student is enrolled
+                    var query2 = from q in query1 join eg in db.EnrollmentGrades on q.ClassId equals eg.ClassId
                                 where eg.UId == uid
                                 select eg;
+
                     // Student not enrolled in this class
-                    if (query == null)
+                    if (!query2.Any())
                     {
                         EnrollmentGrades eg = new EnrollmentGrades();
                         eg.UId = uid;
-                        
+                        eg.ClassId = query1.First().ClassId;
+                        eg.Grade = "";
+                        db.EnrollmentGrades.Add(eg);
+                        db.SaveChanges();
                         return Json(new { success = true });
                     }
                     // Student already enrolled
                     else
                     {
-                        return Json(new { success = true });
+                        return Json(new { success = false });
                     }
                 }
             } catch
@@ -276,9 +284,71 @@ namespace LMS.Controllers
     /// <param name="uid">The uid of the student</param>
     /// <returns>A JSON object containing a single field called "gpa" with the number value</returns>
     public IActionResult GetGPA(string uid)
-    {     
+    {
+            using (db)
+            {
+                var query = from eg in db.EnrollmentGrades where eg.UId == uid select eg.Grade;
+                // Student has no grades
+                if (!query.Any())
+                {
+                    return Json(new { gpa = 0.0 });
+                }
 
-      return Json(null);
+                double gpa = 0.0;
+                int total_courses = 0;
+                foreach (var grade in query.ToList())
+                {
+                    total_courses += 1;
+                    switch (grade)
+                    {
+                        case "A":
+                            gpa += 4.0;
+                            break;
+                        case "A-":
+                            gpa += 3.7;
+                            break;
+                        case "B+":
+                            gpa += 3.3;
+                            break;
+                        case "B":
+                            gpa += 3.0;
+                            break;
+                        case "B-":
+                            gpa += 2.7;
+                            break;
+                        case "C+":
+                            gpa += 2.3;
+                            break;
+                        case "C":
+                            gpa += 2.0;
+                            break;
+                        case "C-":
+                            gpa += 1.7;
+                            break;
+                        case "D+":
+                            gpa += 1.3;
+                            break;
+                        case "D":
+                            gpa += 1.0;
+                            break;
+                        case "D-":
+                            gpa += 0.7;
+                            break;
+                        case "E":
+                            gpa += 0.0;
+                            break;
+                        // no grade
+                        default:
+                            total_courses -= 1;
+                            break;
+                    }
+
+                }
+                gpa /= total_courses;
+                return Json(new { gpa = gpa });
+            }
+
+               
     }
 
     /*******End code to modify********/
