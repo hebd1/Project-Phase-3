@@ -165,7 +165,7 @@ namespace LMS.Controllers
                                     aname = a.Name,
                                     cname = ac.Name,
                                     due = a.DueDate,
-                                    submissions = a.Submissions
+                                    submissions = a.Submissions.Count()
                                 };
                     return Json(query.ToArray());
                 }
@@ -184,7 +184,7 @@ namespace LMS.Controllers
                                     aname = a.Name,
                                     cname = ac.Name,
                                     due = a.DueDate,
-                                    submissions = a.Submissions
+                                    submissions = a.Submissions.Count()
                                 };
                     return Json(query.ToArray());
                 }
@@ -237,38 +237,45 @@ namespace LMS.Controllers
         ///	false if an assignment category with the same name already exists in the same class.</returns>
         public IActionResult CreateAssignmentCategory(string subject, int num, string season, int year, string category, int catweight)
         {
-            using (db)
+            try
             {
-                // return assignments in all categories
-                var query = from co in db.Courses
-                            where co.DeptAbbreviation == subject && co.Number == num
-                            join cl in db.Classes on co.CourseId equals cl.CourseId
-                            where cl.Season == season && cl.Year == year
-                            join ac in db.AssignmentCategories on cl.ClassId equals ac.ClassId
-                            into joined
-                            from j in joined.DefaultIfEmpty()
-                            where j.Name == category
-                            select j;
-
-                /*
-
-                if(!(query.FirstOrDefault().Name == null))
+                using (db)
                 {
-                    return Json(new { success = false });
-                }
-                else
-                {
-                    AssignmentCategories ac = new AssignmentCategories();
-                    //ac.Class = ;
-                    ac.ClassId = query.FirstOrDefault;
-                    ac.GradingWeight = (uint)catweight;
-                    ac.Name = category;
+                    // Holds all assignment categories
+                    var query = from co in db.Courses
+                                where co.DeptAbbreviation == subject && co.Number == num
+                                join cl in db.Classes on co.CourseId equals cl.CourseId
+                                where cl.Season == season && cl.Year == year
+                                select cl;
+                    // Holds assignments with given category name
+                    var query2 = from q in query
+                                 join ac in db.AssignmentCategories on q.ClassId equals ac.ClassId
+                                 where ac.Name == category
+                                 select ac;
 
-                    return Json(new { success = true });
+
+                    if (query2.Any())
+                    {
+                        return Json(new { success = false });
+                    }
+                    else
+                    {
+                        AssignmentCategories ac = new AssignmentCategories();
+                        ac.ClassId = query.FirstOrDefault().ClassId;
+                        ac.GradingWeight = (uint)catweight;
+                        ac.Name = category;
+                        db.AssignmentCategories.Add(ac);
+                        db.SaveChanges();
+                        return Json(new { success = true });
+                    }
+
                 }
-                */
+            }
+            catch
+            {
                 return Json(new { success = false });
             }
+
         }
 
         /// <summary>
@@ -287,8 +294,63 @@ namespace LMS.Controllers
         /// false if an assignment with the same name already exists in the same assignment category.</returns>
         public IActionResult CreateAssignment(string subject, int num, string season, int year, string category, string asgname, int asgpoints, DateTime asgdue, string asgcontents)
         {
+            try
+            {
+                using (db)
+                {
+                    var query = from co in db.Courses
+                                where co.DeptAbbreviation == subject && co.Number == num
+                                join cl in db.Classes on co.CourseId equals cl.CourseId
+                                where cl.Season == season && cl.Year == year
+                                join ac in db.AssignmentCategories on cl.ClassId equals ac.ClassId
+                                where ac.Name == category
+                                select ac;
+                    var query2 = from q in query
+                                 join a in db.Assignments on q.CategoryId equals a.CategoryId
+                                 where a.Name == asgname
+                                 select a;
+                    // Assignment with same name already exists
+                    if (query2.Any())
+                    {
+                        return Json(new { success = false });
+                    }
+                    // Assignment does not yet exist
+                    else
+                    {
+                        Assignments a = new Assignments();
+                        a.Contents = asgcontents;
+                        a.Name = asgname;
+                        a.MaxPoints = (uint)asgpoints;
+                        a.CategoryId = query.FirstOrDefault().CategoryId;
+                        a.DueDate = asgdue;
+                        db.Assignments.Add(a);
+                        db.SaveChanges();
 
-            return Json(new { success = false });
+                        // update grades of all students in the class
+                        var query3 = from co in db.Courses
+                                     where co.DeptAbbreviation == subject && co.Number == num
+                                     join cl in db.Classes on co.CourseId equals cl.CourseId
+                                     where cl.Season == season && cl.Year == year
+                                     join eg in db.EnrollmentGrades on cl.ClassId equals eg.ClassId
+                                     select eg;
+                        foreach (var enrollment in query3.ToList())
+                        {
+                            enrollment.Grade = calculateGrade(db, subject, num, season, year, category, enrollment.UId);
+                        }
+                        db.SaveChanges();
+                        return Json(new { success = true });
+
+
+                    }
+                }
+            }
+            catch
+            {
+                return Json(new { success = false });
+            }
+
+
+
         }
 
 
@@ -311,8 +373,30 @@ namespace LMS.Controllers
         /// <returns>The JSON array</returns>
         public IActionResult GetSubmissionsToAssignment(string subject, int num, string season, int year, string category, string asgname)
         {
+            using (db)
+            {
+                var query = from co in db.Courses
+                            where co.DeptAbbreviation == subject && co.Number == num
+                            join cl in db.Classes on co.CourseId equals cl.CourseId
+                            where cl.Season == season && cl.Year == year
+                            join ac in db.AssignmentCategories on cl.ClassId equals ac.ClassId
+                            where ac.Name == category
+                            join a in db.Assignments on ac.CategoryId equals a.CategoryId
+                            where a.Name == asgname
+                            join s in db.Submissions on a.AssignmentId equals s.AssignmentId
+                            join u in db.Users on s.UId equals u.UId
+                            select new
+                            {
+                                fname = u.FirstName,
+                                lname = u.LastName,
+                                uid = u.UId,
+                                time = s.TimeStamp,
+                                score = s.Score
+                            };
 
-            return Json(null);
+                return Json(query.ToArray());
+            }
+
         }
 
 
@@ -330,8 +414,44 @@ namespace LMS.Controllers
         /// <returns>A JSON object containing success = true/false</returns>
         public IActionResult GradeSubmission(string subject, int num, string season, int year, string category, string asgname, string uid, int score)
         {
+            try
+            {
+                using (db)
+                {
+                    var query = from co in db.Courses
+                                where co.DeptAbbreviation == subject && co.Number == num
+                                join cl in db.Classes on co.CourseId equals cl.CourseId
+                                where cl.Season == season && cl.Year == year
+                                select cl;
+                    var query2 = (from q in query
+                                  join ac in db.AssignmentCategories on q.ClassId equals ac.ClassId
+                                  where ac.Name == category
+                                  join a in db.Assignments on ac.CategoryId equals a.CategoryId
+                                  where a.Name == asgname
+                                  join s in db.Submissions on a.AssignmentId equals s.AssignmentId
+                                  where s.UId == uid
+                                  select s).FirstOrDefault();
+                    var query3 = (from q in query
+                                  join eg in db.EnrollmentGrades on q.ClassId equals eg.ClassId
+                                  where eg.UId == uid
+                                  select eg).FirstOrDefault();
 
-            return Json(new { success = true });
+                    query2.Score = (uint)score;
+                    // update student's grade for class
+                    query3.Grade = calculateGrade(db, subject, num, season, year, category, uid);
+                    db.SaveChanges();
+
+                    return Json(new { success = true });
+                }
+
+
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                return Json(new { success = false });
+            }
+
         }
 
 
@@ -369,6 +489,115 @@ namespace LMS.Controllers
 
 
         /*******End code to modify********/
+
+
+        /// <summary>
+        /// Returns a letter grade i.e. A- based on the given percentage. 
+        /// </summary>
+        /// <param name="percentage"></param>
+        /// <returns></returns>
+        public string percentageToGrade(double percentage)
+        {
+            if (100 >= percentage && percentage >= 93)
+            {
+                return "A";
+            }
+            else if (93 > percentage && percentage >= 90)
+            {
+                return "A-";
+            }
+            else if (90 > percentage && percentage >= 87)
+            {
+                return "B+";
+            }
+            else if (87 > percentage && percentage >= 83)
+            {
+                return "B";
+            }
+            else if (83 > percentage && percentage >= 80)
+            {
+                return "B-";
+            }
+            else if (80 > percentage && percentage >= 77)
+            {
+                return "C+";
+            }
+            else if (77 > percentage && percentage >= 73)
+            {
+                return "C";
+            }
+            else if (73 > percentage && percentage >= 70)
+            {
+                return "C-";
+            }
+            else if (70 > percentage && percentage >= 67)
+            {
+                return "D+";
+            }
+            else if (67 > percentage && percentage >= 63)
+            {
+                return "D";
+            }
+            else if (63 > percentage && percentage >= 60)
+            {
+                return "D-";
+            }
+            else
+            {
+                return "E";
+            }
+        }
+
+        /// <summary>
+        /// Calculates and returns the grade for the for the student with the given uid
+        /// in the given class. A scaled total of points for each assignment in each
+        /// assignment category is used to find the letter grade.
+        /// </summary>
+        /// <param name="db"></param>
+        /// <param name="subject"></param>
+        /// <param name="num"></param>
+        /// <param name="season"></param>
+        /// <param name="year"></param>
+        /// <param name="category"></param>
+        /// <param name="uid"></param>
+        /// <returns></returns>
+        public string calculateGrade(Team31LMSContext db, string subject, int num, string season, int year, string category, string uid)
+        {
+
+            double scaledTotal = 0.0;
+            double weightTotal = 0.0;
+            // Holds all the non-empty assignment categories for the given class
+            var query = from co in db.Courses
+                        where co.DeptAbbreviation == subject && co.Number == num
+                        join cl in db.Classes on co.CourseId equals cl.CourseId
+                        where cl.Season == season && cl.Year == year
+                        join ac in db.AssignmentCategories on cl.ClassId equals ac.ClassId
+                        where ac.Assignments.Any()
+                        select ac;
+
+            // loop through each category
+            foreach (var cat in query.ToList())
+            {
+                var totalPoints = (from a in db.Assignments
+                                   where a.CategoryId == cat.CategoryId
+                                   select a).ToList().Sum(x => x.MaxPoints);
+
+                var earnedPoints = (from a in db.Assignments
+                                    where a.CategoryId == cat.CategoryId
+                                    join s in db.Submissions on a.AssignmentId equals s.AssignmentId
+                                    select s).ToList().Sum(x => x.Score);
+
+                double percentage = earnedPoints > 0 ? totalPoints / earnedPoints : 0;
+                scaledTotal += percentage * cat.GradingWeight;
+                weightTotal += cat.GradingWeight;
+            }
+            // re-scale bc there is no assignment category weight limit
+            double scalingFactor = 100 / weightTotal;
+            double totalPercentage = scaledTotal * scalingFactor;
+            return percentageToGrade(totalPercentage);
+
+
+        }
 
     }
 }

@@ -130,9 +130,9 @@ namespace LMS.Controllers
                              select new
                              {
                                  aname = q.Name,
-                                 cname = q.Category,
+                                 cname = q.Category.Name,
                                  due = q.DueDate,
-                                 score = j.Score
+                                 score = j == null ? null : (uint?)j.Score
                              };
 
                 return Json(query2.ToArray());
@@ -180,12 +180,12 @@ namespace LMS.Controllers
                                  select a;
 
 
-                    var query2 = (from q in query1
+                    var query2 = from q in query1
                                   join s in db.Submissions on q.AssignmentId equals s.AssignmentId
                                   where s.UId == uid
-                                  select s).First();
+                                  select s;
                     // student hasn't submitted assignment yet
-                    if (query2 == null)
+                    if (!query2.Any())
                     {
                         Submissions s = new Submissions();
                         s.TimeStamp = DateTime.Now;
@@ -199,15 +199,15 @@ namespace LMS.Controllers
                     // student already submitted, update timestamp and contents
                     else
                     {
-                        query2.TimeStamp = DateTime.Now;
-                        query2.Contents = contents;
+                        query2.FirstOrDefault().TimeStamp = DateTime.Now;
+                        query2.FirstOrDefault().Contents = contents;
                     }
 
                     db.SaveChanges();
                     return Json(new { success = true });
 
                 }
-            } catch
+            } catch (Exception e)
             {
                 return Json(new { success = false });
             }

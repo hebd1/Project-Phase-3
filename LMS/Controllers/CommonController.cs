@@ -198,8 +198,8 @@ namespace LMS.Controllers
                             join s in db.Submissions on a.AssignmentId equals s.AssignmentId
                             where s.UId == uid
                             select s;
+                return query.Any() ? Content(query.FirstOrDefault().Contents) : Content("");
 
-                return Content(query.ToList()[0].Contents);
 
             }
         }
