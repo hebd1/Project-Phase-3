@@ -237,42 +237,34 @@ namespace LMS.Controllers
         ///	false if an assignment category with the same name already exists in the same class.</returns>
         public IActionResult CreateAssignmentCategory(string subject, int num, string season, int year, string category, int catweight)
         {
-            try
+            using (db)
             {
-                using (db)
+                // return assignments in all categories
+                var query = from co in db.Courses
+                            where co.DeptAbbreviation == subject && co.Number == num
+                            join cl in db.Classes on co.CourseId equals cl.CourseId
+                            where cl.Season == season && cl.Year == year
+                            join ac in db.AssignmentCategories on cl.ClassId equals ac.ClassId
+                            into joined
+                            from j in joined.DefaultIfEmpty()
+                            where j.Name == category
+                            select j;
+
+                /*
+                if(!(query.FirstOrDefault().Name == null))
                 {
-                    // Holds all assignment categories
-                    var query = from co in db.Courses
-                                where co.DeptAbbreviation == subject && co.Number == num
-                                join cl in db.Classes on co.CourseId equals cl.CourseId
-                                where cl.Season == season && cl.Year == year
-                                select cl;
-                    // Holds assignments with given category name
-                    var query2 = from q in query
-                                 join ac in db.AssignmentCategories on q.ClassId equals ac.ClassId
-                                 where ac.Name == category
-                                 select ac;
-
-
-                    if (query2.Any())
-                    {
-                        return Json(new { success = false });
-                    }
-                    else
-                    {
-                        AssignmentCategories ac = new AssignmentCategories();
-                        ac.ClassId = query.FirstOrDefault().ClassId;
-                        ac.GradingWeight = (uint)catweight;
-                        ac.Name = category;
-                        db.AssignmentCategories.Add(ac);
-                        db.SaveChanges();
-                        return Json(new { success = true });
-                    }
-
+                    return Json(new { success = false });
                 }
-            }
-            catch
-            {
+                else
+                {
+                    AssignmentCategories ac = new AssignmentCategories();
+                    //ac.Class = ;
+                    ac.ClassId = query.FirstOrDefault;
+                    ac.GradingWeight = (uint)catweight;
+                    ac.Name = category;
+                    return Json(new { success = true });
+                }
+                */
                 return Json(new { success = false });
             }
 
