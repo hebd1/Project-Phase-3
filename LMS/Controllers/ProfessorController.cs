@@ -244,27 +244,40 @@ namespace LMS.Controllers
                             where co.DeptAbbreviation == subject && co.Number == num
                             join cl in db.Classes on co.CourseId equals cl.CourseId
                             where cl.Season == season && cl.Year == year
-                            join ac in db.AssignmentCategories on cl.ClassId equals ac.ClassId
-                            into joined
-                            from j in joined.DefaultIfEmpty()
-                            where j.Name == category
-                            select j;
+                            select cl;
 
-                /*
-                if(!(query.FirstOrDefault().Name == null))
+                var query2 = from q in query
+                             join a in db.AssignmentCategories on q.ClassId equals a.ClassId
+                             where a.Name == category
+                             select a;
+
+
+
+
+                if(query2.Any())
                 {
                     return Json(new { success = false });
                 }
                 else
                 {
+                    //New assignment category
                     AssignmentCategories ac = new AssignmentCategories();
-                    //ac.Class = ;
-                    ac.ClassId = query.FirstOrDefault;
-                    ac.GradingWeight = (uint)catweight;
-                    ac.Name = category;
-                    return Json(new { success = true });
+
+                    try
+                    {
+                        ac.ClassId = query.First().ClassId;
+                        ac.GradingWeight = (uint)catweight;
+                        ac.Name = category;
+                        db.AssignmentCategories.Add(ac);
+                        db.SaveChanges();
+                        return Json(new { success = true });
+                    }
+                    catch (Exception)
+                    {
+                        return Json(new { success = false });
+                    }
                 }
-                */
+
                 return Json(new { success = false });
             }
 
